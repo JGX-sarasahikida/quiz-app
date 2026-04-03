@@ -282,6 +282,12 @@ document.addEventListener('DOMContentLoaded', () => {
             btnElement.classList.add('correct');
             feedbackBox.classList.add('success');
             feedbackHeadline.innerHTML = '✅ 正解！';
+            
+            // 過去に間違えた問題であれば、正解した今回でリストから削除する
+            if (userData.misses.has(q.id)) {
+                userData.misses.delete(q.id);
+                saveUserData();
+            }
         } else {
             btnElement.classList.add('incorrect');
             feedbackBox.classList.add('error');
