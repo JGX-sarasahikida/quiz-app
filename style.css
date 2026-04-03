@@ -279,9 +279,6 @@ body {
     padding: 20px;
     border-radius: var(--border-radius);
     display: none;
-    position: relative;
-    overflow: visible;
-    padding-right: 90px; /* Space for mascot */
 }
 
 .feedback-box.show { 
@@ -302,24 +299,6 @@ body {
 .feedback-explanation { font-size: 1rem; margin-bottom: 12px; line-height: 1.6; }
 .feedback-reference { font-size: 0.9rem; color: var(--text-muted); text-align: right; font-weight: 500; }
 
-.mascot-img {
-    width: 105px;
-    position: absolute;
-    right: -5px;
-    bottom: -15px;
-    z-index: 10;
-    opacity: 0;
-}
-
-@keyframes mascotFloatUp {
-    0% { transform: translateY(30px); opacity: 0; }
-    100% { transform: translateY(0); opacity: 1; }
-}
-
-.feedback-box.show .mascot-img {
-    animation: mascotFloatUp 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-}
-
 /* Buttons */
 .next-btn {
     margin-top: auto;
@@ -334,8 +313,6 @@ body {
     box-shadow: 0 4px 15px rgba(74, 222, 128, 0.3);
     transition: all 0.2s ease;
     display: none;
-    position: relative;
-    z-index: 11; /* Above mascot */
 }
 .next-btn.show { display: block; margin-top: 32px; animation: slideUp 0.3s ease; }
 
