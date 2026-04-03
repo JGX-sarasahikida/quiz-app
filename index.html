@@ -27,11 +27,11 @@
             <div class="content home-menu">
                 <div class="menu-title">学習メニュー</div>
                 <div class="menu-grid">
-                    <button class="menu-btn" onclick="startAllMode()">
+                    <button class="menu-btn" onclick="showSetupAllScreen()">
                         <span class="menu-icon">📝</span>
                         <div class="menu-text">
                             <strong>全問網羅</strong>
-                            <small>基礎から順番に全問題を解く</small>
+                            <small>範囲を指定して順番に解く</small>
                         </div>
                     </button>
                     <button class="menu-btn" onclick="showScreen('screen-setup')">
@@ -55,6 +55,20 @@
                             <small>解説を一覧で確認して復習</small>
                         </div>
                     </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETUP CHUNKED SCREEN -->
+        <div id="screen-setup-all" class="screen" style="display: none;">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-home')">←</button>
+                全問網羅 設定
+            </div>
+            <div class="content setup-menu">
+                <p class="setup-instruction">解きたい範囲を選んでください</p>
+                <div class="setup-grid" id="chunk-buttons">
+                    <!-- Dynamic buttons go here -->
                 </div>
             </div>
         </div>
@@ -96,9 +110,12 @@
                 <div class="options-grid" id="options-grid"></div>
                 
                 <div id="feedback" class="feedback-box">
-                    <div class="feedback-headline" id="feedback-headline"></div>
-                    <div class="feedback-explanation" id="feedback-explanation"></div>
-                    <div class="feedback-reference" id="feedback-ref"></div>
+                    <div class="feedback-content-wrap">
+                        <div class="feedback-headline" id="feedback-headline"></div>
+                        <div class="feedback-explanation" id="feedback-explanation"></div>
+                        <div class="feedback-reference" id="feedback-ref"></div>
+                    </div>
+                    <img src="Chara2.png" alt="アプリー" class="mascot-img" id="mascot-img" onerror="this.style.display='none'">
                 </div>
 
                 <button id="next-btn" class="next-btn" onclick="nextQuestion()">次の問題へ</button>
@@ -112,7 +129,8 @@
                 <div class="score-circle" id="result-score"></div>
                 <div class="result-message" id="result-message"></div>
                 <div class="result-actions">
-                    <button class="restart-btn" onclick="showScreen('screen-home')">ホームへ戻る</button>
+                    <button class="restart-btn primary-action" onclick="retryQuiz()">もう一度同じ条件で解く</button>
+                    <button class="restart-btn secondary-action" onclick="showScreen('screen-home')">ホームへ戻る</button>
                 </div>
             </div>
         </div>

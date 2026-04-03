@@ -6,7 +6,8 @@ document.addEventListener('DOMContentLoaded', () => {
         quizSet: [],        // Array of question objects for the current session
         currentIndex: 0,
         score: 0,
-        answered: false
+        answered: false,
+        lastConfig: { type: '', filter: null, pickedIds: [] } // For retry logic
     };
     
     // User data persisted in localStorage
@@ -79,6 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         populateSetupScreen();
+        populateChunkButtons();
         showScreen('screen-home');
     }
 
@@ -95,49 +97,85 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    window.showSetupAllScreen = function() {
+        showScreen('screen-setup-all');
+    };
+
     // --- Mode Start Logic ---
-    window.startAllMode = function() {
-        state.mode = '全問網羅';
-        state.quizSet = [...questionsData];
+    window.startChunkedMode = function(start, end) {
+        const pool = questionsData.slice(start, end);
+        state.lastConfig = { type: 'chunk', filter: { start, end }, pickedIds: pool.map(q => q.id) };
+        state.mode = `全問網羅（${start + 1}〜${end}）`;
+        state.quizSet = pool;
         startQuizSession();
     };
 
-    window.startRandom10Mode = function(chapterFilter) {
+    window.startRandom10Mode = function(chapterFilter, avoidIds = []) {
         let pool = [];
+        let availableQuestions = [...questionsData];
+        let preferredQuestions = availableQuestions.filter(q => !avoidIds.includes(q.id));
         
         if (chapterFilter === 'mixed') {
-            const chapters = [...new Set(questionsData.map(q => q.chapter))];
+            const chapters = [...new Set(availableQuestions.map(q => q.chapter))];
             let selected = [];
-            let remaining = [...questionsData];
             
             chapters.forEach(ch => {
-                let chQuestions = remaining.filter(q => q.chapter === ch);
-                shuffleArray(chQuestions);
-                const picked = chQuestions.slice(0, 3);
+                let chPref = preferredQuestions.filter(q => q.chapter === ch);
+                let chAll = availableQuestions.filter(q => q.chapter === ch);
+                
+                shuffleArray(chPref);
+                shuffleArray(chAll);
+                
+                let picked = chPref.slice(0, 3);
+                
+                if (picked.length < 3) {
+                    const needed = 3 - picked.length;
+                    const filling = chAll.filter(q => !picked.includes(q)).slice(0, needed);
+                    picked = picked.concat(filling);
+                }
+                
                 selected = selected.concat(picked);
-                remaining = remaining.filter(q => !picked.includes(q));
+                preferredQuestions = preferredQuestions.filter(q => !picked.includes(q));
+                availableQuestions = availableQuestions.filter(q => !picked.includes(q));
             });
             
-            shuffleArray(remaining);
+            shuffleArray(preferredQuestions);
+            shuffleArray(availableQuestions);
+            
             const needed = 10 - selected.length;
             if (needed > 0) {
-                selected = selected.concat(remaining.slice(0, needed));
+                let picked = preferredQuestions.slice(0, needed);
+                if (picked.length < needed) {
+                    const extraNeeded = needed - picked.length;
+                    const filling = availableQuestions.filter(q => !picked.includes(q)).slice(0, extraNeeded);
+                    picked = picked.concat(filling);
+                }
+                selected = selected.concat(picked);
             }
-            
             pool = selected;
         } else {
-            pool = questionsData.filter(q => q.chapter === chapterFilter);
-            shuffleArray(pool);
-            pool = pool.slice(0, 10);
+            let chPref = preferredQuestions.filter(q => q.chapter === chapterFilter);
+            let chAll = availableQuestions.filter(q => q.chapter === chapterFilter);
+            
+            shuffleArray(chPref);
+            shuffleArray(chAll);
+            
+            pool = chPref.slice(0, 10);
+            if (pool.length < 10) {
+                const needed = 10 - pool.length;
+                const filling = chAll.filter(q => !pool.includes(q)).slice(0, needed);
+                pool = pool.concat(filling);
+            }
         }
 
         shuffleArray(pool);
+        state.lastConfig = { type: 'random10', filter: chapterFilter, pickedIds: pool.map(q => q.id) };
         state.mode = 'ランダム10問';
         state.quizSet = pool;
         startQuizSession();
     };
 
-    window.startWeakMode = function() {
+    window.startWeakMode = function(avoidIds = []) {
         let weakPool = questionsData.filter(q => 
             userData.bookmarks.has(q.id) || userData.misses.has(q.id)
         );
@@ -147,10 +185,36 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        let preferred = weakPool.filter(q => !avoidIds.includes(q.id));
+        shuffleArray(preferred);
         shuffleArray(weakPool);
-        state.quizSet = weakPool.slice(0, 10);
+
+        let pool = preferred.slice(0, 10);
+        if (pool.length < 10) {
+             const needed = 10 - pool.length;
+             const filling = weakPool.filter(q => !pool.includes(q)).slice(0, needed);
+             pool = pool.concat(filling);
+        }
+
+        shuffleArray(pool);
+        state.lastConfig = { type: 'weak', filter: null, pickedIds: pool.map(q => q.id) };
+        state.quizSet = pool;
         state.mode = '苦手克服';
         startQuizSession();
+    };
+
+    window.retryQuiz = function() {
+        const config = state.lastConfig;
+        if(config.type === 'chunk') {
+            // chunk is static index
+            startChunkedMode(config.filter.start, config.filter.end);
+        } else if (config.type === 'random10') {
+            startRandom10Mode(config.filter, config.pickedIds);
+        } else if (config.type === 'weak') {
+            startWeakMode(config.pickedIds);
+        } else {
+            showScreen('screen-home');
+        }
     };
 
     function startQuizSession() {
@@ -348,6 +412,18 @@ document.addEventListener('DOMContentLoaded', () => {
         chapters.forEach(ch => {
             html += `<button class="menu-btn setup-btn" onclick="startRandom10Mode('${ch}')">${ch} のみ出題</button>`;
         });
+        container.innerHTML = html;
+    }
+
+    function populateChunkButtons() {
+        const container = document.getElementById('chunk-buttons');
+        let html = '';
+        const limit = 10;
+        const total = questionsData.length;
+        for(let i = 0; i < total; i += limit) {
+            let end = Math.min(i + limit, total);
+            html += `<button class="menu-btn setup-btn primary" onclick="startChunkedMode(${i}, ${end})"><strong>${i+1}〜${end}番</strong></button>`;
+        }
         container.innerHTML = html;
     }
 
