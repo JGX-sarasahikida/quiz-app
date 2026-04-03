@@ -21,6 +21,19 @@
             </div>
         </div>
 
+        <!-- LOGIN SCREEN -->
+        <div id="screen-login" class="screen" style="display: none;">
+            <div class="login-wrapper">
+                <div class="login-box">
+                    <h1 class="login-title">炭素会計アドバイザー3級</h1>
+                    <p class="login-subtitle">パスワードを入力してください</p>
+                    <input type="password" id="login-password" class="login-input" placeholder="パスワード" onkeypress="if(event.key === 'Enter') handleLogin()">
+                    <div id="login-error" class="login-error"></div>
+                    <button class="login-btn primary-action" onclick="handleLogin()">ログイン</button>
+                </div>
+            </div>
+        </div>
+
         <!-- HOME SCREEN -->
         <div id="screen-home" class="screen" style="display: none;">
             <div class="header">炭素会計アドバイザー3級</div>

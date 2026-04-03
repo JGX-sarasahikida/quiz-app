@@ -440,7 +440,37 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Bootstrapping ---
-    loadUserData();
-    loadQuestions();
+    // --- Authentication & Bootstrapping ---
+    window.checkLoginStatus = function() {
+        const authData = localStorage.getItem('caa_auth');
+        if (authData) {
+            try {
+                const parsed = JSON.parse(authData);
+                const now = Date.now();
+                // 7 days in milliseconds
+                if (now - parsed.timestamp < 604800000) {
+                    loadUserData();
+                    loadQuestions();
+                    return;
+                }
+            } catch (e) {}
+        }
+        showScreen('screen-login');
+    };
+
+    window.handleLogin = function() {
+        const input = document.getElementById('login-password').value;
+        const errorEl = document.getElementById('login-error');
+        // Base64 encoded 'firstsquare0403'
+        if (btoa(input) === 'Zmlyc3RzcXVhcmUwNDAz') {
+            errorEl.textContent = '';
+            localStorage.setItem('caa_auth', JSON.stringify({ timestamp: Date.now() }));
+            loadUserData();
+            loadQuestions();
+        } else {
+            errorEl.textContent = 'パスワードが違います';
+        }
+    };
+
+    checkLoginStatus();
 });
