@@ -498,19 +498,6 @@ body {
     max-width: 380px;
 }
 
-.login-title {
-    color: var(--primary-dark);
-    font-size: 1.4rem;
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-
-.login-subtitle {
-    color: var(--text-muted);
-    font-size: 0.95rem;
-    margin-bottom: 24px;
-}
-
 .login-input {
     width: 100%;
     padding: 16px 20px;
