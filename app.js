@@ -1,194 +1,364 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const appEl = document.getElementById('app');
-    
-    // 状態管理
+    // --- State Management ---
+    let questionsData = [];
     let state = {
-        questions: [],
+        mode: '',           // 'all', 'random10', 'weak'
+        quizSet: [],        // Array of question objects for the current session
         currentIndex: 0,
         score: 0,
         answered: false
     };
+    
+    // User data persisted in localStorage
+    let userData = {
+        bookmarks: new Set(),
+        misses: new Set()
+    };
 
-    // 万が一ファイルアクセスエラーになった時のフォールバックデータ
-    const fallbackData = `章,問題文,選択肢1,選択肢2,選択肢3,選択肢4,正解,ページ,解説
-第1章,パリ協定で合意された気温上昇の抑制目標は？,1.0℃,1.5℃,2.0℃,3.0℃,1.5℃,12,世界共通の長期目標として1.5℃に抑える努力を追求することが合意されました。
-第1章,TCFDの「F」は何の略？,Forest,Future,Financial,Factory,Financial,10,気候関連財務情報開示タスクフォース（Financial）です。
-第1章,2020年に日本政府が宣言したカーボンニュートラルの目標年次は？,2030年,2040年,2050年,2060年,2050年,17,2050年カーボンニュートラルを目指すことが宣言されました。
-第2章,SBTの中小企業版にはない要件は？,Scope1の算定,Scope2の算定,Scope3の算定,コミットメントレターの提出,Scope3の算定,41,中小企業版SBTではScope3の算定・目標設定は任意とされています。
-第2章,企業の再エネ100%化を目指す国際イニシアチブは？,RE100,SBTi,TCFD,CDP,RE100,54,Renewable Energy 100%の略称です。
-第3章,自社での燃料使用による直接的な排出はどのScope？,Scope 1,Scope 2,Scope 3,Scope 4,Scope 1,60,自社による直接排出がScope 1です。
-第3章,他社から供給された電気や熱の使用に伴う間接排出は？,Scope 1,Scope 2,Scope 3,カテゴリ1,Scope 2,60,エネルギー起源の間接排出がScope 2です。
-第4章,Scope 3のカテゴリ1の算定対象は？,自社の固定資産,原材料の採掘から製造まで,製品の廃棄,従業員の通勤,原材料の採掘から製造まで,92,購入した製品やサービスの排出量が対象です。
-第5章,日本の「温対法」の正式名称に含まれる言葉は？,エネルギー使用の合理化,地球温暖化対策の推進,再エネ導入,カーボンリサイクル,地球温暖化対策の推進,155,地球温暖化対策の推進に関する法律です。`;
+    // --- Bootstrapping will happen at the end ---
+
+    function loadUserData() {
+        const storedBookmarks = localStorage.getItem('caa_bookmarks');
+        const storedMisses = localStorage.getItem('caa_misses');
+        
+        if (storedBookmarks) userData.bookmarks = new Set(JSON.parse(storedBookmarks));
+        if (storedMisses) userData.misses = new Set(JSON.parse(storedMisses));
+    }
+
+    function saveUserData() {
+        localStorage.setItem('caa_bookmarks', JSON.stringify([...userData.bookmarks]));
+        localStorage.setItem('caa_misses', JSON.stringify([...userData.misses]));
+    }
+
+    const fallbackData = `ID,タイトル,章,問題文,選択肢1,選択肢2,選択肢3,選択肢4,正解,ページ,解説
+1,パリ協定の目標,第1章,パリ協定で合意された気温上昇の抑制目標は？,1.0℃,1.5℃,2.0℃,3.0℃,1.5℃,12,世界共通の長期目標として1.5℃に抑える努力を追求することが合意されました。
+2,ネットゼロの定義,第1章,温室効果ガスの排出量と吸収量をプラスマイナスゼロにすることを何と呼ぶ？,カーボンマイナス,ネットゼロ,デカーボナイズ,エミッションフリー,ネットゼロ,20,排出と除去のバランスが取れた状態を指します。
+3,CN目標年次,第1章,日本政府が宣言したカーボンニュートラルの目標年次は？,2030年,2040年,2050年,2060年,2050年,17,2050年までの達成を目指しています。`;
 
     function parseCSV(csvText) {
         const lines = csvText.trim().split('\n');
-        const questions = [];
+        const parsed = [];
         
-        // ヘッダー行をスキップ (i=1から開始)
         for (let i = 1; i < lines.length; i++) {
             const row = lines[i].split(',');
-            if (row.length >= 9) {
-                questions.push({
-                    chapter: row[0].trim(),
-                    question: row[1].trim(),
-                    options: [row[2].trim(), row[3].trim(), row[4].trim(), row[5].trim()],
-                    correct: row[6].trim(),
-                    page: row[7].trim(),
-                    explanation: row[8].trim()
+            if (row.length >= 11) {
+                parsed.push({
+                    id: row[0].trim(),
+                    title: row[1].trim(),
+                    chapter: row[2].trim(),
+                    question: row[3].trim(),
+                    options: [row[4].trim(), row[5].trim(), row[6].trim(), row[7].trim()],
+                    correct: row[8].trim(),
+                    page: row[9].trim(),
+                    explanation: row[10].trim()
                 });
             }
         }
-        return questions;
+        return parsed;
     }
 
-    async function loadData() {
-        appEl.innerHTML = '<div class="content loading">クイズデータを読み込んでいます...</div>';
-        
+    async function loadQuestions() {
+        showScreen('screen-loading');
         try {
-            // ローカルファイルからのfetchを試みる
-            const response = await fetch('プロトタイプ１.txt');
+            const response = await fetch('プロトタイプ４.txt');
             if (response.ok) {
                 const text = await response.text();
-                state.questions = parseCSV(text);
+                questionsData = parseCSV(text);
             } else {
-                console.warn('Network load failed, using fallback data...');
-                state.questions = parseCSV(fallbackData);
+                console.warn('Network issue, using fallback data...');
+                questionsData = parseCSV(fallbackData);
             }
         } catch (e) {
-            console.error('Fetch error - Using fallback data (CORS limitation via file:// protocol is normal):', e);
-            state.questions = parseCSV(fallbackData);
+            console.error('Fetch error - Using fallback data:', e);
+            questionsData = parseCSV(fallbackData);
         }
         
-        if(state.questions.length === 0) {
-           appEl.innerHTML = '<div class="content loading">問題データの読み込みに失敗しました。</div>';
-           return; 
+        if (questionsData.length === 0) {
+            alert('データが見つかりません');
+            return;
         }
-
-        renderQuiz();
+        
+        populateSetupScreen();
+        showScreen('screen-home');
     }
 
-    function renderQuiz() {
-        state.answered = false;
+    // --- Routing Framework ---
+    window.showScreen = function(screenId) {
+        const screens = document.querySelectorAll('.screen');
+        screens.forEach(s => s.style.display = 'none');
+        document.getElementById(screenId).style.display = 'flex';
+    };
+
+    window.confirmAbandonQuiz = function() {
+        if(confirm('クイズを中断してホームに戻りますか？')) {
+            showScreen('screen-home');
+        }
+    };
+
+    // --- Mode Start Logic ---
+    window.startAllMode = function() {
+        state.mode = '全問網羅';
+        state.quizSet = [...questionsData];
+        startQuizSession();
+    };
+
+    window.startRandom10Mode = function(chapterFilter) {
+        let pool = [];
         
-        const q = state.questions[state.currentIndex];
-        const progressPercent = ((state.currentIndex) / state.questions.length) * 100;
-
-        appEl.innerHTML = `
-            <div class="header">炭素会計アドバイザー3級</div>
-            <div class="progress-container">
-                <div class="progress-bar" style="width: ${progressPercent}%"></div>
-            </div>
-            <div class="content" id="quiz-content">
-                <div class="chapter-badge">${q.chapter}</div>
-                <div class="question-text">${q.question}</div>
-                
-                <div class="options-grid" id="options-grid">
-                    ${q.options.map((opt, index) => `
-                        <button class="option-btn" data-value="${opt}">${opt}</button>
-                    `).join('')}
-                </div>
-                
-                <div id="feedback" class="feedback-box">
-                    <div class="feedback-headline" id="feedback-headline"></div>
-                    <div class="feedback-explanation">${q.explanation}</div>
-                    <div class="feedback-reference">参照ページ：P.${q.page}</div>
-                </div>
-
-                <button id="next-btn" class="next-btn">次の問題へ</button>
-            </div>
-        `;
-
-        // イベントリスナーの追加
-        const optionBtns = document.querySelectorAll('.option-btn');
-        optionBtns.forEach(btn => {
-            btn.addEventListener('click', (e) => handleAnswer(e.target));
-        });
-
-        document.getElementById('next-btn').addEventListener('click', () => {
-            state.currentIndex++;
-            if (state.currentIndex >= state.questions.length) {
-                renderResult();
-            } else {
-                renderQuiz();
+        if (chapterFilter === 'mixed') {
+            const chapters = [...new Set(questionsData.map(q => q.chapter))];
+            let selected = [];
+            let remaining = [...questionsData];
+            
+            chapters.forEach(ch => {
+                let chQuestions = remaining.filter(q => q.chapter === ch);
+                shuffleArray(chQuestions);
+                const picked = chQuestions.slice(0, 3);
+                selected = selected.concat(picked);
+                remaining = remaining.filter(q => !picked.includes(q));
+            });
+            
+            shuffleArray(remaining);
+            const needed = 10 - selected.length;
+            if (needed > 0) {
+                selected = selected.concat(remaining.slice(0, needed));
             }
-        });
+            
+            pool = selected;
+        } else {
+            pool = questionsData.filter(q => q.chapter === chapterFilter);
+            shuffleArray(pool);
+            pool = pool.slice(0, 10);
+        }
+
+        shuffleArray(pool);
+        state.mode = 'ランダム10問';
+        state.quizSet = pool;
+        startQuizSession();
+    };
+
+    window.startWeakMode = function() {
+        let weakPool = questionsData.filter(q => 
+            userData.bookmarks.has(q.id) || userData.misses.has(q.id)
+        );
+
+        if (weakPool.length === 0) {
+            alert('現在記録されている苦手・ミス問題（または付箋）はありません！\nまずは他のテストを解いてみましょう！');
+            return;
+        }
+
+        shuffleArray(weakPool);
+        state.quizSet = weakPool.slice(0, 10);
+        state.mode = '苦手克服';
+        startQuizSession();
+    };
+
+    function startQuizSession() {
+        if(state.quizSet.length === 0) return;
+        state.currentIndex = 0;
+        state.score = 0;
+        document.getElementById('quiz-header-title').textContent = state.mode;
+        showScreen('screen-quiz');
+        renderQuestion();
     }
 
-    function handleAnswer(selectedBtn) {
-        if (state.answered) return; // 複数回クリックを防ぐ
+    // --- Quiz Logic ---
+    function renderQuestion() {
+        state.answered = false;
+        const q = state.quizSet[state.currentIndex];
+        
+        const progressPercent = (state.currentIndex / state.quizSet.length) * 100;
+        document.getElementById('progress-bar').style.width = `${progressPercent}%`;
+        
+        document.getElementById('quiz-chapter').textContent = q.chapter;
+        document.getElementById('quiz-question').textContent = q.question;
+        
+        const bookmarkBtn = document.getElementById('bookmark-btn');
+        if (userData.bookmarks.has(q.id)) {
+            bookmarkBtn.classList.add('active');
+            bookmarkBtn.innerHTML = '🔖 付箋を外す';
+        } else {
+            bookmarkBtn.classList.remove('active');
+            bookmarkBtn.innerHTML = '🔖 付箋をつける';
+        }
+
+        let optionsHtml = '';
+        const shuffledOptions = [...q.options];
+        shuffleArray(shuffledOptions);
+        
+        shuffledOptions.forEach(opt => {
+            optionsHtml += `<button class="option-btn" onclick="handleAnswer(this, '${opt.replace(/'/g, "\\'")}')">${opt}</button>`;
+        });
+        document.getElementById('options-grid').innerHTML = optionsHtml;
+
+        document.getElementById('feedback').classList.remove('show', 'success', 'error');
+        document.getElementById('next-btn').classList.remove('show');
+    }
+
+    window.handleAnswer = function(btnElement, selectedValue) {
+        if (state.answered) return;
         state.answered = true;
 
-        const q = state.questions[state.currentIndex];
-        const selectedValue = selectedBtn.getAttribute('data-value');
+        const q = state.quizSet[state.currentIndex];
         const isCorrect = selectedValue === q.correct;
         
-        // 全ボタンを無効化
         const optionBtns = document.querySelectorAll('.option-btn');
         optionBtns.forEach(btn => {
             btn.disabled = true;
-            // 正解のボタンは必ずハイライト
-            if (btn.getAttribute('data-value') === q.correct) {
+            if (btn.textContent === q.correct) {
                 btn.classList.add('correct');
             }
         });
 
         const feedbackBox = document.getElementById('feedback');
         const feedbackHeadline = document.getElementById('feedback-headline');
-        const nextBtn = document.getElementById('next-btn');
-
+        
         if (isCorrect) {
             state.score++;
-            selectedBtn.classList.add('correct');
+            btnElement.classList.add('correct');
             feedbackBox.classList.add('success');
             feedbackHeadline.innerHTML = '✅ 正解！';
         } else {
-            selectedBtn.classList.add('incorrect');
+            btnElement.classList.add('incorrect');
             feedbackBox.classList.add('error');
             feedbackHeadline.innerHTML = '❌ 不正解...';
+            userData.misses.add(q.id);
+            saveUserData();
         }
 
+        document.getElementById('feedback-explanation').textContent = q.explanation;
+        document.getElementById('feedback-ref').textContent = `参照ページ：P.${q.page}`;
         feedbackBox.classList.add('show');
         
-        // 最後の問題の場合はボタンのテキストを変更
-        if(state.currentIndex === state.questions.length - 1) {
+        const nextBtn = document.getElementById('next-btn');
+        if (state.currentIndex === state.quizSet.length - 1) {
             nextBtn.textContent = '結果を見る';
+        } else {
+            nextBtn.textContent = '次の問題へ';
         }
-        
-        // 次へボタンを表示
         nextBtn.classList.add('show');
-    }
+    };
 
-    function renderResult() {
-        const progressPercent = 100;
+    window.nextQuestion = function() {
+        state.currentIndex++;
+        if (state.currentIndex >= state.quizSet.length) {
+            renderResult();
+        } else {
+            renderQuestion();
+        }
+    };
+
+    window.toggleBookmark = function() {
+        if (state.quizSet.length === 0) return;
+        const q = state.quizSet[state.currentIndex];
+        const bookmarkBtn = document.getElementById('bookmark-btn');
         
-        // 全問正解時のメッセージを変える
-        const isPerfect = state.score === state.questions.length;
+        if (userData.bookmarks.has(q.id)) {
+            userData.bookmarks.delete(q.id);
+            bookmarkBtn.classList.remove('active');
+            bookmarkBtn.innerHTML = '🔖 付箋をつける';
+        } else {
+            userData.bookmarks.add(q.id);
+            bookmarkBtn.classList.add('active');
+            bookmarkBtn.innerHTML = '🔖 付箋を外す';
+        }
+        saveUserData();
+    };
 
-        appEl.innerHTML = `
-            <div class="header">炭素会計アドバイザー3級</div>
-            <div class="progress-container">
-                <div class="progress-bar" style="width: ${progressPercent}%"></div>
-            </div>
-            <div class="content result-screen">
-                <div class="score-circle">
-                    ${state.score} / ${state.questions.length}
-                </div>
-                <div class="result-message">
-                    全${state.questions.length}問中、<strong>${state.score}問</strong>正解しました！<br><br>
-                    ${isPerfect ? '素晴らしい！全問正解です！🎉' : 'お疲れ様でした。復習して満点を目指しましょう！💪'}
-                </div>
-                <button class="restart-btn" id="restart-btn">もう一度挑戦する</button>
-            </div>
+    // --- Result Logic ---
+    function renderResult() {
+        document.getElementById('progress-bar').style.width = '100%';
+        document.getElementById('result-score').textContent = `${state.score} / ${state.quizSet.length}`;
+        
+        const isPerfect = state.score === state.quizSet.length;
+        document.getElementById('result-message').innerHTML = `
+            全${state.quizSet.length}問中、<strong>${state.score}問</strong>正解しました！<br><br>
+            ${isPerfect ? '素晴らしい！全問正解です！🎉' : '解説を確認したり、苦手モードを活用して復習しましょう！💪'}
         `;
-
-        document.getElementById('restart-btn').addEventListener('click', () => {
-            state.currentIndex = 0;
-            state.score = 0;
-            renderQuiz();
-        });
+        
+        showScreen('screen-result');
     }
 
-    // アプリ起動
-    loadData();
+    // --- Review List Logic ---
+    window.showReviewList = function() {
+        const container = document.getElementById('review-list-container');
+        container.innerHTML = '';
+        
+        const reviewItems = questionsData.filter(q => 
+            userData.bookmarks.has(q.id) || userData.misses.has(q.id)
+        );
+
+        document.getElementById('review-stats').textContent = 
+            `付箋: ${userData.bookmarks.size}件 / 過去のミス: ${userData.misses.size}件`;
+
+        if (reviewItems.length === 0) {
+            container.innerHTML = '<div class="empty-state">復習データがありません。<br>クイズを解いてみましょう！</div>';
+            showScreen('screen-review');
+            return;
+        }
+
+        reviewItems.forEach(q => {
+            const isMiss = userData.misses.has(q.id);
+            const isBookmarked = userData.bookmarks.has(q.id);
+            
+            let tagsHtml = '';
+            if (isMiss) tagsHtml += '<span class="tag tag-miss">過去ミス</span>';
+            if (isBookmarked) tagsHtml += '<span class="tag tag-bookmark">🔖 付箋</span>';
+
+            const itemDiv = document.createElement('div');
+            itemDiv.className = 'accordion-item';
+            
+            itemDiv.innerHTML = `
+                <div class="accordion-header" onclick="this.parentElement.classList.toggle('open')">
+                    <div class="accordion-title-container">
+                        <span>${q.title}</span>
+                        <div class="accordion-tags">${tagsHtml}</div>
+                    </div>
+                    <div class="accordion-icon">▼</div>
+                </div>
+                <div class="accordion-content">
+                    <div class="review-qa">
+                        <div class="review-q">Q. ${q.question}</div>
+                        <div class="review-a">A. ${q.correct}</div>
+                    </div>
+                    <div class="review-exp">${q.explanation}</div>
+                    <div class="review-page">参照: P.${q.page}</div>
+                    ${isBookmarked ? `<button class="remove-bookmark-btn" onclick="removeBookmarkFromList('${q.id}')">🔖 付箋を外す</button>` : ''}
+                </div>
+            `;
+            container.appendChild(itemDiv);
+        });
+
+        showScreen('screen-review');
+    };
+
+    window.removeBookmarkFromList = function(id) {
+        if(confirm('付箋を削除しますか？')) {
+            userData.bookmarks.delete(id);
+            saveUserData();
+            showReviewList(); // 画面再描画
+        }
+    };
+
+    // --- Helpers ---
+    function populateSetupScreen() {
+        const chapters = [...new Set(questionsData.map(q => q.chapter))].sort();
+        const container = document.getElementById('chapter-buttons');
+        let html = '';
+        chapters.forEach(ch => {
+            html += `<button class="menu-btn setup-btn" onclick="startRandom10Mode('${ch}')">${ch} のみ出題</button>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function shuffleArray(array) {
+        for (let i = array.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [array[i], array[j]] = [array[j], array[i]];
+        }
+    }
+
+    // --- Bootstrapping ---
+    loadUserData();
+    loadQuestions();
 });

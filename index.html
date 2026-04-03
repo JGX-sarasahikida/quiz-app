@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>炭素会計アドバイザー3級 クイズ</title>
-    <meta name="description" content="炭素会計アドバイザー3級 クイズ学習アプリ">
+    <title>炭素会計アドバイザー3級 学習アプリ</title>
+    <meta name="description" content="炭素会計アドバイザー3級 対策用クイズアプリ">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
@@ -12,7 +12,125 @@
 </head>
 <body>
     <div id="app" class="container">
-        <!-- JS will render content here -->
+        
+        <!-- INITIAL LOADING -->
+        <div id="screen-loading" class="screen">
+            <div class="loading-state">
+                <div class="spinner"></div>
+                <p>クイズデータを読み込んでいます...</p>
+            </div>
+        </div>
+
+        <!-- HOME SCREEN -->
+        <div id="screen-home" class="screen" style="display: none;">
+            <div class="header">炭素会計アドバイザー3級</div>
+            <div class="content home-menu">
+                <div class="menu-title">学習メニュー</div>
+                <div class="menu-grid">
+                    <button class="menu-btn" onclick="startAllMode()">
+                        <span class="menu-icon">📝</span>
+                        <div class="menu-text">
+                            <strong>全問網羅</strong>
+                            <small>基礎から順番に全問題を解く</small>
+                        </div>
+                    </button>
+                    <button class="menu-btn" onclick="showScreen('screen-setup')">
+                        <span class="menu-icon">🎲</span>
+                        <div class="menu-text">
+                            <strong>ランダム10問</strong>
+                            <small>各章からバランスよく出題</small>
+                        </div>
+                    </button>
+                    <button class="menu-btn" onclick="startWeakMode()">
+                        <span class="menu-icon">🎯</span>
+                        <div class="menu-text">
+                            <strong>苦手・ミス克服テスト</strong>
+                            <small>付箋とミスの問題からランダム</small>
+                        </div>
+                    </button>
+                    <button class="menu-btn highlight-btn" onclick="showReviewList()">
+                        <span class="menu-icon">📓</span>
+                        <div class="menu-text">
+                            <strong>苦手・ミスを振り返る</strong>
+                            <small>解説を一覧で確認して復習</small>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- SETUP SCREEN -->
+        <div id="screen-setup" class="screen" style="display: none;">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-home')">←</button>
+                ランダム10問 設定
+            </div>
+            <div class="content setup-menu">
+                <p class="setup-instruction">出題範囲を選んでください</p>
+                <div class="setup-grid">
+                    <button class="menu-btn setup-btn primary" onclick="startRandom10Mode('mixed')">
+                        <strong>全章から混合 (おすすめ)</strong>
+                        <small>各章からバランスよく10問抽出</small>
+                    </button>
+                    <div id="chapter-buttons">
+                        <!-- Chapter buttons injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- QUIZ SCREEN -->
+        <div id="screen-quiz" class="screen" style="display: none;">
+            <div class="header">
+                <button class="back-btn" onclick="confirmAbandonQuiz()">←</button>
+                <span id="quiz-header-title">クイズ</span>
+            </div>
+            <div class="progress-container"><div class="progress-bar" id="progress-bar"></div></div>
+            <div class="content" id="quiz-content">
+                <div class="quiz-top-bar">
+                    <div class="chapter-badge" id="quiz-chapter"></div>
+                    <button class="bookmark-btn" id="bookmark-btn" onclick="toggleBookmark()">🔖 付箋</button>
+                </div>
+                <div class="question-text" id="quiz-question"></div>
+                
+                <div class="options-grid" id="options-grid"></div>
+                
+                <div id="feedback" class="feedback-box">
+                    <div class="feedback-headline" id="feedback-headline"></div>
+                    <div class="feedback-explanation" id="feedback-explanation"></div>
+                    <div class="feedback-reference" id="feedback-ref"></div>
+                </div>
+
+                <button id="next-btn" class="next-btn" onclick="nextQuestion()">次の問題へ</button>
+            </div>
+        </div>
+
+        <!-- RESULT SCREEN -->
+        <div id="screen-result" class="screen" style="display: none;">
+            <div class="header">結果発表</div>
+            <div class="content result-screen">
+                <div class="score-circle" id="result-score"></div>
+                <div class="result-message" id="result-message"></div>
+                <div class="result-actions">
+                    <button class="restart-btn" onclick="showScreen('screen-home')">ホームへ戻る</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- REVIEW SCREEN -->
+        <div id="screen-review" class="screen" style="display: none;">
+            <div class="header">
+                <button class="back-btn" onclick="showScreen('screen-home')">←</button>
+                苦手・ミスを振り返る
+            </div>
+            <div class="content review-screen">
+                <div class="review-stats" id="review-stats"></div>
+                <div id="review-list-container" class="accordion-container">
+                    <!-- Iterated items go here -->
+                </div>
+            </div>
+        </div>
+
     </div>
     <script src="app.js"></script>
 </body>
